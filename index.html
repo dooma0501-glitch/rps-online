@@ -195,9 +195,16 @@
   .lvbox{display:flex;align-items:center;gap:8px;justify-content:center;margin:8px auto;font-weight:700;color:#3a6e1f;max-width:300px}
   .xpbar{flex:1;height:12px;background:#dfe6cf;border-radius:8px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.2)}
   .xpbar i{display:block;height:100%;background:linear-gradient(90deg,#7bc23f,#ffe45e);border-radius:8px;transition:width .4s}
-  #unlocks,#shop,#upgrades,#colors,#terms,#online{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,rgba(40,70,30,.6),rgba(8,16,8,.82));backdrop-filter:blur(5px)}
-  #terms{z-index:90}
-  #unlocks.hide,#shop.hide,#upgrades.hide,#colors.hide,#terms.hide,#online.hide{display:none}
+  #unlocks,#shop,#upgrades,#colors,#terms,#online,#admin{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,rgba(40,70,30,.6),rgba(8,16,8,.82));backdrop-filter:blur(5px)}
+  #terms,#admin{z-index:90}
+  #unlocks.hide,#shop.hide,#upgrades.hide,#colors.hide,#terms.hide,#online.hide,#admin.hide{display:none}
+  .admin-in{letter-spacing:0 !important;text-transform:none !important;text-align:right}
+  .admstat{background:#2c2640;color:#e8def5;border-radius:10px;padding:8px 10px;margin:6px 0 10px;font-size:.92rem}
+  .admrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.08)}
+  .admrow>span{font-weight:700;color:#3a6e1f;font-size:.9rem}
+  .admrow>div{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+  .admrow button{border:none;border-radius:10px;padding:7px 10px;font-family:inherit;font-weight:700;font-size:.82rem;cursor:pointer;background:#eef5dd;color:#3a6e1f;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+  .admrow button:hover{background:#e0eecb}.admrow button.danger{background:#c0392b;color:#fff}
   .ucard .sw{width:26px;height:26px;border-radius:50%;border:2px solid rgba(0,0,0,.25);box-shadow:inset 0 1px 3px rgba(255,255,255,.4);flex:none}
   .terms-txt{text-align:right;font-size:.74rem;line-height:1.55;color:#555;max-height:230px;overflow-y:auto;background:#f6f8ef;border:1px solid #d7e0c2;border-radius:10px;padding:10px 12px;margin:8px 0}
   .terms-txt b{color:#3a6e1f}
@@ -256,7 +263,7 @@
 </defs></svg>
 
 <div id="win">
-  <div id="titlebar"><span>🥷 RPS Online</span>
+  <div id="titlebar"><span>🥷 D.Y Online</span>
     <span class="tbtns"><button class="iconbtn" id="fsBtn">⛶</button><button class="iconbtn" id="gearBtn">⚙️</button><button class="iconbtn" id="exitBtn" title="יציאה">🚪</button></span></div>
 
   <div id="main">
@@ -267,7 +274,7 @@
     </div>
     <div id="right">
       <span class="lantern l1"></span><span class="lantern l2"></span>
-      <div class="logo"><b>RPS</b><br><span>ONLINE</span></div>
+      <div class="logo"><b>D.Y</b><br><span>ONLINE</span></div>
       <div id="score">🏆 0 : 0</div>
       <svg class="ref" id="ref" viewBox="0 0 152 124"></svg>
       <div id="turnLbl"></div>
@@ -303,6 +310,7 @@
   <div id="colors" class="hide"></div>
   <div id="terms" class="hide"></div>
   <div id="online" class="hide"></div>
+  <div id="admin" class="hide"></div>
 </div>
 
 <script>
@@ -566,7 +574,7 @@ function hideOverlay(){overlay.classList.add("hide");overlay.innerHTML="";}
 function showSetup(){
   phase="setup";clearInterval(timerInt);particles=[];showOverlay();renderScore();$("win").classList.remove("playing");
   const pct=prog.level>=100?100:Math.round((prog.xp%XP_LV)/XP_LV*100);
-  overlay.innerHTML=`<div class="card menu" dir="rtl"><h1>RPS ONLINE</h1><p class="sub">קרב האבן · נייר · מספריים</p>
+  overlay.innerHTML=`<div class="card menu" dir="rtl"><h1 id="logoTitle">D.Y ONLINE</h1><p class="sub">קרב האבן · נייר · מספריים</p>
     <div class="lvbox">⭐ רמה ${prog.level}<div class="xpbar"><i style="width:${pct}%"></i></div>${prog.level>=100?"מקס":""}<span class="gembox">💎 ${prog.gems}</span></div>
     <div class="optrow"><div class="optg"><span class="gl">מצב משחק</span>
       <button class="opt" data-g="mode" data-v="cpu">🤖 נגד המחשב</button><button class="opt" data-g="mode" data-v="2p">👥 2 שחקנים</button></div></div>
@@ -581,7 +589,7 @@ function showSetup(){
       <button class="mbtn" id="openUnlocks">🎁<span>פתיחות</span></button>
       <button class="mbtn" id="openSet">⚙️<span>הגדרות</span></button>
     </div>
-    <div class="hint">כל חייל הוא בסוד אבן / נייר / מספריים · הצב 🪵 טוטם־מלכודת שבולע כל מי שתוקף אותו · בתיקו שני הלוחמים בוחרים נשק מחדש!</div></div>`;
+    <div class="hint" style="text-align:right;line-height:1.6">🎯 <b>איך משחקים:</b><br>• לכל חייל יש נשק חבוי — 🪨 אבן · 📄 נייר · ✂️ מספריים.<br>• זזים תור-תור. כשנכנסים ליריב — נלחמים לפי אבן·נייר·מספריים (תיקו = בוחרים נשק מחדש).<br>• 🪵 <b>הטוטם</b> בולע כל מי שתוקף אותו לחור שחור.<br>• 👑 <b>המצביא</b> הוא הלב — אם היריב לוכד אותו, הפסדת.<br>• <b>מנצחים</b> בלכידת המצביא או בחיסול כל חיילי היריב.</div></div>`;
   syncOpts();
   overlay.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{const g=b.dataset.g;if(g==="mode")mode=b.dataset.v;else difficulty=b.dataset.v;syncOpts();});
   $("go").onclick=()=>{ac();sSel();startPlacement();};
@@ -591,7 +599,37 @@ function showSetup(){
   $("openUp").onclick=()=>showUpgrades();
   $("openColors").onclick=()=>showColors();
   $("openOnline").onclick=()=>showOnline();
+  const lt=$("logoTitle");if(lt)lt.onclick=adminTap;
 }
+const ADMIN={user:"admin",pass:"dy1234"};
+let adminTaps=0,adminTapTimer=0;
+function adminTap(){adminTaps++;clearTimeout(adminTapTimer);adminTapTimer=setTimeout(()=>{adminTaps=0;},1500);if(adminTaps>=5){adminTaps=0;showAdminLogin();}}
+function showAdminLogin(){const u=$("admin");u.classList.remove("hide");
+  u.innerHTML=`<div class="card" dir="rtl"><h2>🔐 כניסת מנהל</h2>
+    <input class="codein admin-in" id="admUser" placeholder="שם משתמש" autocomplete="off">
+    <input class="codein admin-in" id="admPass" type="password" placeholder="סיסמה" autocomplete="off">
+    <div class="ost" id="admErr" style="color:#c0392b;min-height:1em"></div>
+    <div class="obtns"><button class="bigbtn" id="admGo">כניסה ▶</button><button class="devbtn" id="admCancel" style="background:#777">ביטול</button></div></div>`;
+  const tryLogin=()=>{if($("admUser").value.trim()===ADMIN.user&&$("admPass").value===ADMIN.pass)showAdmin();else $("admErr").textContent="שם משתמש או סיסמה שגויים ✖";};
+  $("admGo").onclick=tryLogin;$("admPass").addEventListener("keydown",e=>{if(e.key==="Enter")tryLogin();});
+  $("admCancel").onclick=()=>{u.classList.add("hide");u.innerHTML="";};}
+function setAdminLevel(n){n=Math.max(1,Math.min(100,n));prog.xp=(n-1)*XP_LV;calcLevel();}
+function adminAct(a){
+  if(a==="g100")prog.gems+=100;else if(a==="g1000")prog.gems+=1000;else if(a==="g0")prog.gems=0;else if(a==="gmax")prog.gems=999999;
+  else if(a==="lm1")setAdminLevel(prog.level-1);else if(a==="lp1")setAdminLevel(prog.level+1);else if(a==="lp10")setAdminLevel(prog.level+10);else if(a==="lmax")setAdminLevel(100);else if(a==="l1")setAdminLevel(1);
+  else if(a==="unlock"){prog.gems=Math.max(prog.gems,99999);prog.owned=SHOP.map(s=>s.id);prog.premOwned=COLORS.filter(c=>c.premium).map(c=>c.id);prog.up={range:2,leap:1,dodge:4,income:3};setAdminLevel(100);}
+  else if(a==="reset"){if(!confirm("לאפס את כל ההתקדמות?"))return;prog=JSON.parse(JSON.stringify(PROG_DEF));}
+  calcLevel();saveProg();}
+function showAdmin(){const u=$("admin");u.classList.remove("hide");
+  u.innerHTML=`<div class="card" dir="rtl"><h2>🛠️ פאנל מנהל</h2>
+    <div class="admstat">⭐ רמה <b>${prog.level}</b> &nbsp;·&nbsp; 💎 <b>${prog.gems}</b> &nbsp;·&nbsp; XP <b>${prog.xp}</b></div>
+    <div class="admrow"><span>💎 יהלומים</span><div><button data-a="g100">+100</button><button data-a="g1000">+1000</button><button data-a="gmax">∞</button><button data-a="g0">0</button></div></div>
+    <div class="admrow"><span>⭐ רמה</span><div><button data-a="lm1">−1</button><button data-a="lp1">+1</button><button data-a="lp10">+10</button><button data-a="lmax">100</button><button data-a="l1">1</button></div></div>
+    <div class="admrow"><span>🔓 פתיחה</span><div><button data-a="unlock">פתח הכל</button></div></div>
+    <div class="admrow"><span>🔄 איפוס</span><div><button data-a="reset" class="danger">אפס התקדמות</button></div></div>
+    <button class="bigbtn" id="admClose">סגור ושמור</button></div>`;
+  u.querySelectorAll(".admrow button").forEach(b=>b.onclick=()=>{adminAct(b.dataset.a);showAdmin();});
+  $("admClose").onclick=()=>{u.classList.add("hide");u.innerHTML="";applyTheme();showSetup();};}
 // ===== ONLINE (PeerJS) — Stage 1: lobby + cross-net chat =====
 let peer=null,conn=null,isHost=false,online=false,myCode="",flipView=false,hostReady=false,guestArmy=null;
 function netSend(o){try{if(conn&&conn.open)conn.send(o);}catch(e){}}
