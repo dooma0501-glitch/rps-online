@@ -318,6 +318,7 @@
 const ROWS=6,COLS=7,CELL=60,PAD=8,PS=54,OFF=(CELL-PS)/2,BW=PAD*2+COLS*CELL,BH=PAD*2+ROWS*CELL,TC=2*Math.PI*29;
 const TYPES=["rock","paper","scissors"];
 const NAME={rock:"אבן",paper:"נייר",scissors:"מספריים",wood:"טוטם",flag:"מצביא"};
+const TYPEMOJI={rock:"🪨",paper:"📄",scissors:"✂️",wood:"🪵",flag:"👑"};
 const px=c=>PAD+c*CELL,py=r=>PAD+r*CELL,sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const rnd=a=>a[Math.random()*a.length|0],rr=(a,b)=>a+Math.random()*(b-a);
 const other=o=>o==="red"?"blue":"red",clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -335,7 +336,7 @@ try{const s=JSON.parse(localStorage.getItem("rps_score"));if(s&&typeof s.red==="
 try{const s=JSON.parse(localStorage.getItem("rps_set2"));if(s){sound=s.sound!==false;volume=typeof s.volume==="number"?s.volume:volume;}}catch(e){}
 const saveScore=()=>{try{localStorage.setItem("rps_score",JSON.stringify(score))}catch(e){}};
 const saveSet=()=>{try{localStorage.setItem("rps_set2",JSON.stringify({sound,volume}))}catch(e){}};
-const PROG_DEF={xp:0,level:1,theme:"china",gems:0,owned:[],gear:{helmet:"",weapon:"",shield:"",armor:""},up:{range:0,leap:0,dodge:0,income:0},color:"red",premOwned:[]};
+const PROG_DEF={xp:0,level:1,theme:"china",gems:0,owned:[],gear:{helmet:"",weapon:"",shield:"",armor:""},up:{range:0,leap:0,dodge:0,income:0},color:"red",premOwned:[],streak:0};
 let prog=Object.assign({},PROG_DEF);
 try{const s=JSON.parse(localStorage.getItem("rps_prog"));if(s&&typeof s.xp==="number")prog=Object.assign({},PROG_DEF,s);}catch(e){}
 if(!prog.gear||typeof prog.gear!=="object")prog.gear={helmet:"",weapon:"",shield:"",armor:""};
@@ -345,6 +346,7 @@ if(!prog.up||typeof prog.up!=="object")prog.up={};
 ["range","leap","dodge","income"].forEach(k=>{if(typeof prog.up[k]!=="number")prog.up[k]=0;});
 if(typeof prog.color!=="string")prog.color="red";
 if(!Array.isArray(prog.premOwned))prog.premOwned=[];
+if(typeof prog.streak!=="number")prog.streak=0;
 const XP_LV=120;
 function calcLevel(){prog.level=Math.min(100,1+Math.floor(prog.xp/XP_LV));}
 function addXP(n){const before=prog.level;prog.xp+=n;calcLevel();saveProg();return prog.level-before;}
@@ -353,7 +355,15 @@ const THEMES=[{id:"china",name:"🀄 סין העתיקה",lv:1},{id:"russia",nam
 const UNITS=[{lv:10,icon:"🛡️",name:"מגן",desc:"חוסם את ההתקפה הראשונה"},{lv:20,icon:"⚔️",name:"פושט",desc:"מנצח חיילים רגילים"},{lv:30,icon:"🏹",name:"קשת",desc:"פוגע ממרחק 2 משבצות"},{lv:40,icon:"🥷",name:"מתנקש",desc:"זז עד 2 משבצות"},{lv:50,icon:"🐉",name:"דרקון",desc:"שורף בניצחון"},{lv:60,icon:"💣",name:"מפציץ",desc:"מתפוצץ כשנלכד"},{lv:70,icon:"🧱",name:"חומה",desc:"חוסם ולא זז"},{lv:80,icon:"👻",name:"רוח רפאים",desc:"חומק מעבר לחייל אחד"},{lv:90,icon:"⚡",name:"ברק",desc:"תמיד מכה ראשון"},{lv:100,icon:"👑",name:"אלוף",desc:"מנצח קרב אחד באופן מוחלט"}];
 function applyTheme(){document.body.className=("theme-"+prog.theme);}
 calcLevel();
-let xpGained=0,lvlsGained=0,gemGained=0;
+let xpGained=0,lvlsGained=0,gemGained=0,lastStreakBonus=0,lastUnlocks=[];
+function unlocksBetween(lo,hi){const o=[];
+  THEMES.forEach(t=>{if(t.lv>lo&&t.lv<=hi)o.push("🖼️ "+t.name);});
+  UNITS.forEach(u=>{if(u.lv>lo&&u.lv<=hi)o.push(u.icon+" "+u.name);});
+  COLORS.forEach(c=>{if(!c.premium&&c.lv>lo&&c.lv<=hi)o.push("🎨 "+c.name);});
+  return o;}
+function nextUnlock(){let best=null;const c=(lv,name)=>{if(lv>prog.level&&(!best||lv<best.lv))best={lv,name};};
+  THEMES.forEach(t=>c(t.lv,"🖼️ "+t.name));UNITS.forEach(u=>c(u.lv,u.icon+" "+u.name));COLORS.forEach(x=>{if(!x.premium)c(x.lv,"🎨 "+x.name);});
+  return best;}
 const SHOP=[
   {id:"h_kabuto",slot:"helmet",name:"קסדת קאבוטו",icon:"🪖",cost:40},
   {id:"h_horns",slot:"helmet",name:"קרני שד",icon:"😈",cost:70},
@@ -576,6 +586,7 @@ function showSetup(){
   const pct=prog.level>=100?100:Math.round((prog.xp%XP_LV)/XP_LV*100);
   overlay.innerHTML=`<div class="card menu" dir="rtl"><h1 id="logoTitle">D.Y ONLINE</h1><p class="sub">קרב האבן · נייר · מספריים</p>
     <div class="lvbox">⭐ רמה ${prog.level}<div class="xpbar"><i style="width:${pct}%"></i></div>${prog.level>=100?"מקס":""}<span class="gembox">💎 ${prog.gems}</span></div>
+    ${(()=>{const n=nextUnlock();return (prog.level<100&&n)?`<div style="text-align:center;font-size:.75rem;color:#7a9c3c;margin:-2px 0 4px;font-weight:600">🔜 רמה ${n.lv}: ${n.name}${prog.streak>1?` &nbsp;·&nbsp; 🔥 רצף ${prog.streak}`:""}</div>`:(prog.streak>1?`<div style="text-align:center;font-size:.75rem;color:#e8631a;margin:-2px 0 4px;font-weight:600">🔥 רצף ${prog.streak}</div>`:"");})()}
     <div class="optrow"><div class="optg"><span class="gl">מצב משחק</span>
       <button class="opt" data-g="mode" data-v="cpu">🤖 נגד המחשב</button><button class="opt" data-g="mode" data-v="2p">👥 2 שחקנים</button></div></div>
     <div class="optrow"><div class="optg"><span class="gl">רמת קושי</span>
@@ -823,6 +834,8 @@ function showOver(w){showOverlay();const youWin=mode==="cpu"&&w==="red";
     <p style="font-family:Fredoka;font-size:1.3rem;color:#3a6e1f">🏆 ${score.red} : ${score.blue}</p>
     <p style="color:#c97a00;font-weight:700;margin-bottom:2px">+${xpGained} XP &nbsp; +${gemGained} 💎${lvlsGained>0?` &nbsp;🆙 <b>רמה ${prog.level}!</b>`:""}</p>
     <div class="lvbox" style="justify-content:center">⭐ רמה ${prog.level}<div class="xpbar" style="max-width:200px"><i style="width:0%"></i></div></div>
+    ${(mode==="cpu"&&prog.streak>1)?`<p style="color:#e8631a;font-weight:800;margin:2px 0">🔥 רצף ${prog.streak} ניצחונות${lastStreakBonus?` · בונוס +${lastStreakBonus} 💎`:""}</p>`:""}
+    ${(lastUnlocks&&lastUnlocks.length)?`<p style="color:#7a3fbf;font-weight:800;margin:2px 0">🎉 נפתח: ${lastUnlocks.join(" · ")}</p>`:""}
     <p>${mode==="cpu"?(youWin?"כל הכבוד! 🏆":"נסה שוב 💪"):""}</p>
     <button class="bigbtn" id="again">▶ שחק שוב</button>
     <div class="menurow" style="grid-template-columns:repeat(3,1fr)">
@@ -870,6 +883,7 @@ function buildGame(){
 function addPiece(owner,type,r,c){
   const el=document.createElement("div");el.className="piece";el.style.setProperty("--bd",(-(Math.random()*2.6).toFixed(2))+"s");board.appendChild(el);
   const p={id:nextId,owner,type,r,c,el};pieces[nextId]=p;grid[r][c]=nextId;nextId++;renderFigure(p);setPos(p);
+  el.style.opacity="0";const idx=p.id;setTimeout(()=>{if(pieces[idx]&&pieces[idx].el===el){el.style.transition="transform .4s cubic-bezier(.4,.02,.3,1),opacity .45s";el.style.opacity="1";}},60+(idx%14)*30);
 }
 function setPos(p){const vc=flipView?COLS-1-p.c:p.c,vr=flipView?ROWS-1-p.r:p.r;p.el.style.transition="transform .4s cubic-bezier(.4,.02,.3,1)";p.el.style.opacity="";p.el.style.transform=`translate(${px(vc)+OFF}px,${py(vr)+OFF}px)`;}
 function setType(p,t){const sp=x=>x==="wood"||x==="flag";const was=p.type;p.type=t;
@@ -878,7 +892,9 @@ function setType(p,t){const sp=x=>x==="wood"||x==="flag";const was=p.type;p.type
 function setTypeAt(o,r,c,t){const p=pieces[grid[r][c]];if(p&&p.owner===o)setType(p,t);}
 function ownPieces(o){return Object.values(pieces).filter(p=>p.owner===o);}
 function countType(o,t){return ownPieces(o).filter(p=>p.type===t).length;}
-function randomArmy(o){const ps=ownPieces(o);ps.forEach(p=>setType(p,rnd(TYPES)));setType(rnd(ps),"wood");let f;do{f=rnd(ps);}while(f.type==="wood");setType(f,"flag");}
+function randomArmy(o){const ps=ownPieces(o);const t=[];for(let i=0;i<4;i++)t.push("rock","paper","scissors");t.push("wood","flag");
+  for(let i=t.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const x=t[i];t[i]=t[j];t[j]=x;}
+  ps.forEach((p,i)=>setType(p,t[i]||"rock"));}
 function markHome(who){board.querySelectorAll(".cell").forEach((el,i)=>{let r=Math.floor(i/COLS);if(flipView)r=ROWS-1-r;el.classList.toggle("mine",who==="red"?r>=4:r<2);});}
 function setVisibility(viewer){for(const id in pieces){const p=pieces[id];p.el.classList.toggle("show",p.owner===viewer);if(p.type==="wood"||p.type==="flag")renderFigure(p);}}
 function ninjaOf(p){return p.el.querySelector(".ninja");}
@@ -914,7 +930,7 @@ function killAway(p,dr,dc){if(!pieces[p.id])return;const cx=px(p.c)+CELL/2,cy=py
 function renderScore(){$("score").innerHTML=`🏆 <span style="color:#c0392b">${score.red}</span> : <span style="color:#2471a3">${score.blue}</span>`;}
 function updateCounts(){let r=0,b=0;for(const id in pieces){pieces[id].owner==="red"?r++:b++;}
   const nb=$("nameBlue"),nr=$("nameRed");
-  if(phase==="place"){const comp=`🪨${countType(placer,"rock")} 📄${countType(placer,"paper")} ✂️${countType(placer,"scissors")} 🪵${countType(placer,"wood")} 👑${countType(placer,"flag")}`;
+  if(phase==="place"){const comp=`🪨${countType(placer,"rock")}/4 📄${countType(placer,"paper")}/4 ✂️${countType(placer,"scissors")}/4 🪵${countType(placer,"wood")}/1 👑${countType(placer,"flag")}/1`;
     nr.textContent=placer==="red"?`🔴 ${pname("red")} — ${comp}`:`🔴 ${pname("red")}`;nb.textContent=placer==="blue"?`🔵 ${pname("blue")} — ${comp}`:`🔵 ${pname("blue")}`;}
   else{nr.textContent=`🔴 ${pname("red")} (${r})`;nb.textContent=`🔵 ${pname("blue")} (${b})`;}
   nr.classList.toggle("act",phase==="play"&&turn==="red");nb.classList.toggle("act",phase==="play"&&turn==="blue");return{r,b};}
@@ -930,8 +946,10 @@ board.addEventListener("click",e=>{
   const vc=Math.floor(((e.clientX-rect.left)/S-board.clientLeft-PAD)/CELL),vr=Math.floor(((e.clientY-rect.top)/S-board.clientTop-PAD)/CELL);
   if(!inB(vr,vc))return;
   const r=flipView?ROWS-1-vr:vr,c=flipView?COLS-1-vc:vc;
-  if(phase==="place"){const id=grid[r][c];if(id&&pieces[id].owner===placer){
-      if(brush==="wood"||brush==="flag"){ownPieces(placer).forEach(p=>{if(p.type===brush)setType(p,"rock");});setType(pieces[id],brush);}else setType(pieces[id],brush);
+  if(phase==="place"){const id=grid[r][c];if(id&&pieces[id].owner===placer){const cur=pieces[id];
+      if(brush==="wood"||brush==="flag"){ownPieces(placer).forEach(p=>{if(p.type===brush)setType(p,"rock");});setType(cur,brush);}
+      else if(brush!=="rock"&&cur.type!==brush&&countType(placer,brush)>=4){statusEl.textContent="מקסימום 4 "+TYPEMOJI[brush]+" "+NAME[brush];return;}
+      else setType(cur,brush);
       sSel();updateCounts();}return;}
   if(mode==="online"&&!isHost){if(phase==="play"&&turn==="blue")netSend({t:"tap",r,c});return;}
   if(phase!=="play"||busy)return;
@@ -968,6 +986,7 @@ muteBtn.onclick=()=>{sound=!sound;muteBtn.textContent=sound?"🔊":"🔇";if(sou
 function finishPlacement(){
   if(countType(placer,"wood")!==1){statusEl.textContent="הצב טוטם אחד בדיוק 🪵";return;}
   if(countType(placer,"flag")!==1){statusEl.textContent="הצב מצביא אחד בדיוק 👑";return;}
+  if(countType(placer,"rock")!==4||countType(placer,"paper")!==4||countType(placer,"scissors")!==4){statusEl.textContent="צריך בדיוק 4 🪨 · 4 📄 · 4 ✂️";return;}
   if(mode==="online"){placebar.classList.add("hide");
     if(isHost){hostReady=true;statusEl.textContent=guestArmy?"מתחיל…":"מוכן! ממתין שהיריב יסיים… ⏳";tryStartOnline();}
     else{netSend({t:"army",pieces:ownPieces("blue").map(p=>({r:p.r,c:p.c,type:p.type}))});statusEl.textContent="מוכן! ממתין שהמארח יתחיל… ⏳";}
@@ -1002,8 +1021,13 @@ function checkEnd(){const{r,b}=updateCounts();if(r===0){endGame("blue");return t
   if(!hasMoves(other(turn))){endGame(turn);return true;}return false;}
 function endGame(w){phase="over";busy=false;clearInterval(timerInt);deselect();if(mode==="online"&&isHost)netSend({t:"over",w});for(const id in pieces)pieces[id].el.classList.add("show");
   clearRefTurn();renderTurnLbl();setTimer(60,true);score[w]++;saveScore();renderScore();
+  const oldLevel=prog.level;
   xpGained=mode==="cpu"?(w==="red"?100:30):60;lvlsGained=addXP(xpGained);
-  gemGained=mode==="cpu"?(w==="red"?8:2):4;if(mode!=="cpu"||w==="red")gemGained+=(up().income||0)*2;prog.gems+=gemGained;saveProg();
+  if(mode==="cpu")prog.streak=(w==="red")?(prog.streak||0)+1:0;
+  lastStreakBonus=(mode==="cpu"&&w==="red")?Math.min(prog.streak,6)*2:0;
+  gemGained=mode==="cpu"?(w==="red"?8:2):4;if(mode!=="cpu"||w==="red")gemGained+=(up().income||0)*2;gemGained+=lastStreakBonus;prog.gems+=gemGained;
+  lastUnlocks=lvlsGained>0?unlocksBetween(oldLevel,prog.level):[];
+  saveProg();
   mode==="cpu"?(w==="red"?sWin():sLose()):sWin();speak(w==="red"?"אדום ניצח":"כחול ניצח");confetti(160);fireworks();setTimeout(()=>showOver(w),1500);}
 
 function pickWeapon(who){
