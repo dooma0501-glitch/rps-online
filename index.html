@@ -377,7 +377,7 @@ const UPGRADES=[
   {id:"income",icon:"💰",name:"שלל מוגבר",desc:"הרווח +2 💎 נוספים בכל ניצחון לכל רמה",max:3,costs:[100,200,350]}
 ];
 function up(){return prog.up||{};}
-function isMine(o){return mode!=="cpu"||o==="red";}
+function isMine(o){return mode==="cpu"?(o==="red"):(mode==="online"?false:true);}
 const COLORS=[
   {id:"red",name:"אדום",c:"#b23a2a",lv:1},{id:"orange",name:"כתום",c:"#d4691e",lv:1},
   {id:"amber",name:"ענבר",c:"#dca017",lv:2},{id:"lime",name:"ליים",c:"#74a82e",lv:3},
@@ -393,10 +393,14 @@ const COLORS=[
 function darken(hex,f){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);if(!m)return hex;const r=Math.round(parseInt(m[1],16)*f),g=Math.round(parseInt(m[2],16)*f),b=Math.round(parseInt(m[3],16)*f);return "#"+[r,g,b].map(x=>x.toString(16).padStart(2,"0")).join("");}
 function colorUnlocked(c){return c.premium?prog.premOwned.includes(c.id):prog.level>=c.lv;}
 function playerColor(){const c=COLORS.find(x=>x.id===prog.color);return (c&&colorUnlocked(c))?c:COLORS[0];}
-function pal(team){if(typeof mode!=="undefined"&&mode==="online"){return team==="red"?{gi:"#b23a2a",giD:"#7c2316",hair:"#3a2a18",band:"#5e1810",glow:null}:{gi:"#3f74c9",giD:"#28528f",hair:"#2a4fa0",band:"#16356e",glow:null};}
-  if(team!=="red"){return {gi:"#3f74c9",giD:"#28528f",hair:"#2a4fa0",band:"#16356e",glow:null};}
-  const pc=playerColor();if(pc.c==="rainbow")return {gi:"url(#gRainbow)",giD:"#6a2a8a",hair:"#3a2a18",band:"#4a1a6a",glow:null};
+function mySide(){return mode==="online"?(isHost?"red":"blue"):"red";}
+function myPal(){const pc=playerColor();if(pc.c==="rainbow")return {gi:"url(#gRainbow)",giD:"#6a2a8a",hair:"#3a2a18",band:"#4a1a6a",glow:null};
   return {gi:pc.c,giD:darken(pc.c,.6),hair:"#3a2a18",band:darken(pc.c,.42),glow:pc.glow?pc.c:null};}
+function pal(team){
+  const BLUE={gi:"#3f74c9",giD:"#28528f",hair:"#2a4fa0",band:"#16356e",glow:null};
+  const RED={gi:"#b23a2a",giD:"#7c2316",hair:"#3a2a18",band:"#5e1810",glow:null};
+  if(team===mySide())return myPal();
+  return team==="red"?RED:BLUE;}
 
 function ac(){try{if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)();masterGain=audioCtx.createGain();masterGain.gain.value=volume;masterGain.connect(audioCtx.destination);}if(audioCtx.state==="suspended")audioCtx.resume();}catch(e){}return audioCtx;}
 function tone(f,d,t,v,dl){if(!sound)return;const c=ac();if(!c)return;const tt=c.currentTime+(dl||0);const o=c.createOscillator(),g=c.createGain();o.type=t||"square";o.frequency.value=f;g.gain.setValueAtTime(v||.12,tt);g.gain.exponentialRampToValueAtTime(.0008,tt+d);o.connect(g);g.connect(masterGain||c.destination);o.start(tt);o.stop(tt+d+.02);}
@@ -474,7 +478,7 @@ function fighterSVG(team){
       <circle cx="25.7" cy="26.6" r=".7" fill="#fff"/><circle cx="37.7" cy="26.6" r=".7" fill="#fff"/></g>
     <circle cx="18" cy="31" r="2.3" fill="#ff8f7a" opacity=".5"/><circle cx="42" cy="31" r="2.3" fill="#ff8f7a" opacity=".5"/>
     <path d="M27 32 Q30 34 33 32" stroke="#9a5230" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-    <g class="sword"><line x1="45" y1="48" x2="59" y2="20" stroke="#dfe6ec" stroke-width="3" stroke-linecap="round"/><line x1="45" y1="48" x2="42" y2="54" stroke="#3a2a14" stroke-width="4" stroke-linecap="round"/><line x1="41" y1="49" x2="49" y2="47" stroke="#caa14a" stroke-width="2.5" stroke-linecap="round"/></g>${gearLayers()}</svg>`;
+    <g class="sword"><line x1="45" y1="48" x2="59" y2="20" stroke="#dfe6ec" stroke-width="3" stroke-linecap="round"/><line x1="45" y1="48" x2="42" y2="54" stroke="#3a2a14" stroke-width="4" stroke-linecap="round"/><line x1="41" y1="49" x2="49" y2="47" stroke="#caa14a" stroke-width="2.5" stroke-linecap="round"/></g>${(team===mySide())?gearLayers():""}</svg>`;
 }
 function treeSVG(){return `<svg class="ninja" viewBox="0 0 60 66">
   <ellipse cx="30" cy="62" rx="16" ry="3.6" fill="rgba(0,0,0,.28)"/>
@@ -580,7 +584,7 @@ function showSetup(){
   $("openOnline").onclick=()=>showOnline();
 }
 // ===== ONLINE (PeerJS) — Stage 1: lobby + cross-net chat =====
-let peer=null,conn=null,isHost=false,online=false,myCode="";
+let peer=null,conn=null,isHost=false,online=false,myCode="",flipView=false;
 function netSend(o){try{if(conn&&conn.open)conn.send(o);}catch(e){}}
 function oStat(t){const e=$("ost");if(e)e.textContent=t;}
 function genCode(){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<5;i++)s+=a[Math.floor(Math.random()*a.length)];return s;}
@@ -636,11 +640,11 @@ function handleNet(msg){if(!msg||typeof msg!=="object")return;
 }
 function closePeer(){try{if(peer)peer.destroy();}catch(e){}peer=null;}
 function closeNet(){try{if(conn)conn.close();}catch(e){}closePeer();conn=null;online=false;}
-function startOnlineHost(){if(!isHost||!online)return;netSend({t:"begin"});
+function startOnlineHost(){if(!isHost||!online)return;flipView=false;netSend({t:"begin"});
   $("online").classList.add("hide");$("online").innerHTML="";hideOverlay();
   mode="online";$("win").classList.add("playing");placebar.classList.add("hide");playbar.classList.add("hide");
   buildGame();phase="play";setVisibility("red");broadcastState();beginTurn("red");}
-function guestStart(){mode="online";isHost=false;
+function guestStart(){mode="online";isHost=false;flipView=true;
   $("online").classList.add("hide");$("online").innerHTML="";hideOverlay();
   $("win").classList.add("playing");placebar.classList.add("hide");playbar.classList.add("hide");
   buildBoardCells();phase="play";statusEl.textContent="המשחק התחיל!";}
@@ -654,7 +658,7 @@ function broadcastState(){if(!online||!isHost)return;
   const st=phase==="over"?"המשחק נגמר":(turn==="blue"?"תורך — בחר חייל":"ממתין ליריב… ⏳");
   netSend({t:"state",turn,phase,pieces:arr,sel,moves:mv,status:st,score,time:timeLeft});}
 function mkGuestPiece(d){const el=document.createElement("div");el.className="piece";el.style.setProperty("--bd",(-(Math.random()*2.6).toFixed(2))+"s");
-  el.style.transition="none";el.style.transform="translate("+(px(d.c)+OFF)+"px,"+(py(d.r)+OFF)+"px)";board.appendChild(el);
+  const vc=flipView?COLS-1-d.c:d.c,vr=flipView?ROWS-1-d.r:d.r;el.style.transition="none";el.style.transform="translate("+(px(vc)+OFF)+"px,"+(py(vr)+OFF)+"px)";board.appendChild(el);
   const p={id:d.id,owner:d.o,type:d.t||"rock",r:d.r,c:d.c,el};pieces[d.id]=p;return p;}
 function renderSnapshot(s){turn=s.turn;phase=s.phase;if(s.score){score=s.score;renderScore();}
   const seen={};
@@ -667,7 +671,7 @@ function renderSnapshot(s){turn=s.turn;phase=s.phase;if(s.score){score=s.score;r
   renderTurnLbl();statusEl.textContent=s.status||"";
   if(s.time!=null){tnum.textContent=s.time;tring.style.strokeDashoffset=(1-s.time/60)*TC;tring.style.stroke=turn==="red"?"#e23b2e":"#2b86c5";timerBox.classList.toggle("low",s.time<=10);}
   setRefTurn(turn);
-  clearArrows();(s.moves||[]).forEach(m=>{const a=document.createElement("div");a.className="arrow "+(m.a?"attack":"move");a.innerHTML=m.a?crossSwords():swordMark();a.style.left=px(m.c)+"px";a.style.top=py(m.r)+"px";board.appendChild(a);});
+  clearArrows();(s.moves||[]).forEach(m=>{const a=document.createElement("div");a.className="arrow "+(m.a?"attack":"move");a.innerHTML=m.a?crossSwords():swordMark();a.style.left=px(flipView?COLS-1-m.c:m.c)+"px";a.style.top=py(flipView?ROWS-1-m.r:m.r)+"px";board.appendChild(a);});
   if(s.sel){const row=grid[s.sel.r];const id=row&&row[s.sel.c];if(id&&pieces[id])pieces[id].el.classList.add("sel");}}
 function guestTap(r,c){if(!isHost||mode!=="online"||phase!=="play"||busy||turn!=="blue")return;if(!inB(r,c))return;
   const id=grid[r][c];
@@ -793,7 +797,7 @@ function showSettings(){settingsEl.classList.remove("hide");
 }
 
 function startPlacement(){
-  hideOverlay();particles=[];buildGame();
+  flipView=false;mode=mode==="online"?"cpu":mode;hideOverlay();particles=[];buildGame();
   phase="place";placer="red";$("win").classList.add("playing");
   placebar.classList.remove("hide");playbar.classList.add("hide");
   brush="rock";document.querySelectorAll(".brush").forEach(x=>x.classList.toggle("on",x.dataset.t==="rock"));
@@ -815,7 +819,7 @@ function addPiece(owner,type,r,c){
   const el=document.createElement("div");el.className="piece";el.style.setProperty("--bd",(-(Math.random()*2.6).toFixed(2))+"s");board.appendChild(el);
   const p={id:nextId,owner,type,r,c,el};pieces[nextId]=p;grid[r][c]=nextId;nextId++;renderFigure(p);setPos(p);
 }
-function setPos(p){p.el.style.transition="transform .4s cubic-bezier(.4,.02,.3,1)";p.el.style.opacity="";p.el.style.transform=`translate(${px(p.c)+OFF}px,${py(p.r)+OFF}px)`;}
+function setPos(p){const vc=flipView?COLS-1-p.c:p.c,vr=flipView?ROWS-1-p.r:p.r;p.el.style.transition="transform .4s cubic-bezier(.4,.02,.3,1)";p.el.style.opacity="";p.el.style.transform=`translate(${px(vc)+OFF}px,${py(vr)+OFF}px)`;}
 function setType(p,t){const sp=x=>x==="wood"||x==="flag";const was=p.type;p.type=t;
   if(sp(was)||sp(t))renderFigure(p);
   else{const w=p.el.querySelector(".weapon");if(w)w.innerHTML=iconOf(t);}}
@@ -876,7 +880,7 @@ board.addEventListener("click",e=>{
   if(phase==="place"){const id=grid[r][c];if(id&&pieces[id].owner===placer){
       if(brush==="wood"||brush==="flag"){ownPieces(placer).forEach(p=>{if(p.type===brush)setType(p,"rock");});setType(pieces[id],brush);}else setType(pieces[id],brush);
       sSel();updateCounts();}return;}
-  if(mode==="online"&&!isHost){if(phase==="play"&&turn==="blue")netSend({t:"tap",r,c});return;}
+  if(mode==="online"&&!isHost){if(phase==="play"&&turn==="blue"){const lr=flipView?ROWS-1-r:r,lc=flipView?COLS-1-c:c;netSend({t:"tap",r:lr,c:lc});}return;}
   if(phase!=="play"||busy)return;
   if(mode==="online"&&turn!=="red")return;
   const id=grid[r][c];
