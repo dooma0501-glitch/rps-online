@@ -195,9 +195,9 @@
   .lvbox{display:flex;align-items:center;gap:8px;justify-content:center;margin:8px auto;font-weight:700;color:#3a6e1f;max-width:300px}
   .xpbar{flex:1;height:12px;background:#dfe6cf;border-radius:8px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.2)}
   .xpbar i{display:block;height:100%;background:linear-gradient(90deg,#7bc23f,#ffe45e);border-radius:8px;transition:width .4s}
-  #unlocks,#shop,#upgrades,#colors,#terms{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,rgba(40,70,30,.6),rgba(8,16,8,.82));backdrop-filter:blur(5px)}
+  #unlocks,#shop,#upgrades,#colors,#terms,#online{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,rgba(40,70,30,.6),rgba(8,16,8,.82));backdrop-filter:blur(5px)}
   #terms{z-index:90}
-  #unlocks.hide,#shop.hide,#upgrades.hide,#colors.hide,#terms.hide{display:none}
+  #unlocks.hide,#shop.hide,#upgrades.hide,#colors.hide,#terms.hide,#online.hide{display:none}
   .ucard .sw{width:26px;height:26px;border-radius:50%;border:2px solid rgba(0,0,0,.25);box-shadow:inset 0 1px 3px rgba(255,255,255,.4);flex:none}
   .terms-txt{text-align:right;font-size:.74rem;line-height:1.55;color:#555;max-height:230px;overflow-y:auto;background:#f6f8ef;border:1px solid #d7e0c2;border-radius:10px;padding:10px 12px;margin:8px 0}
   .terms-txt b{color:#3a6e1f}
@@ -224,12 +224,19 @@
   .card.menu{max-width:440px}
   .sub{margin-top:-2px;letter-spacing:2px;color:#7a9c3c;font-size:.92rem;font-weight:600}
   .gembox{margin-right:12px;color:#c97a00;font-weight:800}
-  .menurow{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:14px 0 8px}
+  .menurow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 8px}
+  .mbtn.online{background:linear-gradient(180deg,#3aa0ff,#2471c9);color:#fff;box-shadow:0 2px 8px rgba(36,113,201,.5)}
+  .mbtn.online span{color:#eaf4ff}.mbtn.online:hover{background:linear-gradient(180deg,#4fb0ff,#2f7fd6)}
+  #online .code{font-family:Fredoka,monospace;font-size:2rem;font-weight:800;letter-spacing:6px;color:#2471a3;background:#eef5ff;border:2px dashed #8fb4e0;border-radius:12px;padding:10px;margin:8px 0;text-align:center;user-select:all}
+  #online input.codein{font-family:Fredoka,monospace;font-size:1.4rem;letter-spacing:4px;text-align:center;text-transform:uppercase;width:100%;padding:10px;border:2px solid #8fb85a;border-radius:12px;margin:6px 0}
+  #online .ost{font-size:.9rem;color:#555;margin:8px 0;min-height:1.2em}
+  .obtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
   .mbtn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 2px;border:none;border-radius:14px;background:#eef5dd;cursor:pointer;font-family:inherit;font-weight:700;font-size:1.4rem;color:#3a6e1f;box-shadow:0 2px 6px rgba(0,0,0,.13);transition:transform .12s,background .2s}
   .mbtn span{font-size:.74rem;color:#5a7a2a;font-weight:700}
   .mbtn:hover{background:#e2efc8;transform:translateY(-2px)}
   .mbtn:active{transform:translateY(0)}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute"><defs>
@@ -294,6 +301,7 @@
   <div id="upgrades" class="hide"></div>
   <div id="colors" class="hide"></div>
   <div id="terms" class="hide"></div>
+  <div id="online" class="hide"></div>
 </div>
 
 <script>
@@ -552,6 +560,7 @@ function showSetup(){
       <button class="opt" data-g="dif" data-v="easy">קל</button><button class="opt" data-g="dif" data-v="normal">רגיל</button><button class="opt" data-g="dif" data-v="hard">קשה</button></div></div>
     <button class="bigbtn" id="go">▶ שחק</button>
     <div class="menurow">
+      <button class="mbtn online" id="openOnline">🌐<span>אונליין</span></button>
       <button class="mbtn" id="openUp">⚒️<span>שדרוגים</span></button>
       <button class="mbtn" id="openShop">🛒<span>חנות</span></button>
       <button class="mbtn" id="openColors">🎨<span>צבעים</span></button>
@@ -567,7 +576,55 @@ function showSetup(){
   $("openShop").onclick=()=>showShop();
   $("openUp").onclick=()=>showUpgrades();
   $("openColors").onclick=()=>showColors();
+  $("openOnline").onclick=()=>showOnline();
 }
+// ===== ONLINE (PeerJS) — Stage 1: lobby + cross-net chat =====
+let peer=null,conn=null,isHost=false,online=false,myCode="";
+function netSend(o){try{if(conn&&conn.open)conn.send(o);}catch(e){}}
+function oStat(t){const e=$("ost");if(e)e.textContent=t;}
+function genCode(){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<5;i++)s+=a[Math.floor(Math.random()*a.length)];return s;}
+function netLog(who,t){const l=$("netlog");if(!l)return;const d=document.createElement("div");d.style.margin="2px 0";d.textContent=who+": "+t;l.appendChild(d);l.scrollTop=l.scrollHeight;}
+function showOnline(){const u=$("online");u.classList.remove("hide");
+  u.innerHTML=`<div class="card" dir="rtl"><h2>🌐 משחק אונליין</h2>
+    <p style="font-size:.82rem;color:#777;margin-bottom:4px">שחקן אחד יוצר משחק ומקבל קוד · השני מצטרף עם הקוד</p>
+    <div class="obtns"><button class="bigbtn" id="oCreate">➕ צור משחק</button><button class="bigbtn" id="oJoin">🔑 הצטרף</button></div>
+    <div id="oBody"></div>
+    <button class="devbtn" id="oClose" style="background:#777">סגור</button></div>`;
+  $("oCreate").onclick=hostGame;$("oJoin").onclick=joinPrompt;
+  $("oClose").onclick=()=>{closeNet();u.classList.add("hide");u.innerHTML="";};
+}
+function needPeer(){if(typeof Peer==="undefined"){alert("ספריית הרשת לא נטענה — צריך אינטרנט. פתח דרך הלינק של האתר.");return false;}return true;}
+function hostGame(){if(!needPeer())return;isHost=true;closePeer();const code=genCode();
+  $("oBody").innerHTML=`<div class="ost" id="ost">פותח חדר…</div>`;
+  peer=new Peer("rpsx-"+code);
+  peer.on("open",()=>{myCode=code;$("oBody").innerHTML=`<p style="margin:6px 0 2px">שתף את הקוד עם היריב:</p><div class="code">${code}</div><div class="ost" id="ost">⏳ ממתין שהיריב יצטרף…</div>`;});
+  peer.on("connection",c=>{conn=c;bindConn();});
+  peer.on("error",e=>{if(e&&e.type==="unavailable-id"){hostGame();return;}oStat("שגיאה: "+((e&&e.type)||e));});
+}
+function joinPrompt(){if(!needPeer())return;isHost=false;
+  $("oBody").innerHTML=`<input class="codein" id="codein" maxlength="5" placeholder="הקלד קוד"><div class="obtns"><button class="bigbtn" id="oGo">התחבר ▶</button></div><div class="ost" id="ost"></div>`;
+  $("oGo").onclick=()=>{const code=(($("codein").value)||"").trim().toUpperCase();if(code.length<4){oStat("קוד לא תקין");return;}
+    closePeer();oStat("מתחבר…");peer=new Peer();
+    peer.on("open",()=>{conn=peer.connect("rpsx-"+code,{reliable:true});bindConn();});
+    peer.on("error",e=>{oStat("שגיאה: "+((e&&e.type)||e)+" — בדוק את הקוד");});};
+}
+function bindConn(){
+  conn.on("open",()=>{online=true;oStat("✅ מחובר! "+(isHost?"אתה המארח":"הצטרפת"));netSend({t:"hi"});
+    const b=$("oBody");if(b)b.innerHTML+=`<p style="color:#2e7d32;font-weight:700;margin:8px 0 4px">מחוברים! 🎉 בדקו צ'אט (סנכרון המשחק בשלב הבא):</p>
+      <div id="netlog" style="max-height:120px;overflow-y:auto;text-align:right;font-size:.86rem;background:#f6f8ef;border-radius:8px;padding:6px;margin-bottom:6px"></div>
+      <div class="obtns"><input class="codein" id="netchat" style="font-size:1rem;letter-spacing:0;flex:1" placeholder="הודעה ליריב"><button class="bigbtn" id="netsend">שלח</button></div>`;
+    const ns=$("netsend");if(ns)ns.onclick=netChatSend;const nc=$("netchat");if(nc)nc.addEventListener("keydown",e=>{if(e.key==="Enter")netChatSend();});});
+  conn.on("data",handleNet);
+  conn.on("close",()=>{online=false;oStat("היריב התנתק ✖");});
+  conn.on("error",e=>{oStat("שגיאת חיבור: "+((e&&e.type)||e));});
+}
+function netChatSend(){const i=$("netchat");if(!i)return;const t=i.value.trim();if(!t)return;netLog("אתה",t);netSend({t:"chat",text:t});i.value="";}
+function handleNet(msg){if(!msg||typeof msg!=="object")return;
+  if(msg.t==="chat")netLog("יריב",String(msg.text).slice(0,200));
+  // (next stage: t==="place" / "move" / "pick" / "state")
+}
+function closePeer(){try{if(peer)peer.destroy();}catch(e){}peer=null;}
+function closeNet(){try{if(conn)conn.close();}catch(e){}closePeer();conn=null;online=false;}
 function showTerms(){const u=$("terms");u.classList.remove("hide");
   u.innerHTML=`<div class="card" dir="rtl"><h2>📜 תקנון ותנאי שימוש</h2>
     <div class="terms-txt">
