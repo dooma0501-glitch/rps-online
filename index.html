@@ -586,7 +586,7 @@ function showSetup(){
   $("openOnline").onclick=()=>showOnline();
 }
 // ===== ONLINE (PeerJS) — Stage 1: lobby + cross-net chat =====
-let peer=null,conn=null,isHost=false,online=false,myCode="",flipView=false;
+let peer=null,conn=null,isHost=false,online=false,myCode="",flipView=false,hostReady=false,guestArmy=null;
 function netSend(o){try{if(conn&&conn.open)conn.send(o);}catch(e){}}
 function oStat(t){const e=$("ost");if(e)e.textContent=t;}
 function genCode(){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<5;i++)s+=a[Math.floor(Math.random()*a.length)];return s;}
@@ -633,8 +633,9 @@ function handleNet(msg){if(!msg||typeof msg!=="object")return;
   if(isHost){
     if(msg.t==="tap")guestTap(msg.r,msg.c);
     else if(msg.t==="pick"){const fn=repickResolver;repickResolver=null;if(fn)fn(msg.weapon);}
+    else if(msg.t==="army"){guestArmy=msg.pieces||[];if(hostReady)statusEl.textContent="מתחיל…";tryStartOnline();}
   }else{
-    if(msg.t==="begin")guestStart();
+    if(msg.t==="setup")onlineSetup("blue");
     else if(msg.t==="state")renderSnapshot(msg);
     else if(msg.t==="pickreq"){repickResolver=(w)=>netSend({t:"pick",weapon:w});showChoice("blue");}
     else if(msg.t==="over")endGame(msg.w);
@@ -642,14 +643,18 @@ function handleNet(msg){if(!msg||typeof msg!=="object")return;
 }
 function closePeer(){try{if(peer)peer.destroy();}catch(e){}peer=null;}
 function closeNet(){try{if(conn)conn.close();}catch(e){}closePeer();conn=null;online=false;}
-function startOnlineHost(){if(!isHost||!online)return;flipView=false;netSend({t:"begin"});
+function startOnlineHost(){if(!isHost||!online)return;netSend({t:"setup"});onlineSetup("red");}
+function onlineSetup(side){mode="online";flipView=(side==="blue");hostReady=false;guestArmy=null;
   $("online").classList.add("hide");$("online").innerHTML="";hideOverlay();
-  mode="online";$("win").classList.add("playing");placebar.classList.add("hide");playbar.classList.add("hide");
-  buildGame();phase="play";setVisibility("red");broadcastState();beginTurn("red");}
-function guestStart(){mode="online";isHost=false;flipView=true;
-  $("online").classList.add("hide");$("online").innerHTML="";hideOverlay();
-  $("win").classList.add("playing");placebar.classList.add("hide");playbar.classList.add("hide");
-  buildBoardCells();phase="play";statusEl.textContent="המשחק התחיל!";}
+  $("win").classList.add("playing");
+  buildGame();phase="place";placer=side;
+  placebar.classList.remove("hide");playbar.classList.add("hide");
+  brush="rock";document.querySelectorAll(".brush").forEach(x=>x.classList.toggle("on",x.dataset.t==="rock"));
+  setVisibility(side);markHome(side);setRefTurn(side);
+  setTimer(60,true);renderTurnLbl();statusEl.textContent="סדר את הצבא שלך 🥷 → ✓ מוכן";updateCounts();}
+function tryStartOnline(){if(!isHost||!hostReady||!guestArmy)return;
+  guestArmy.forEach(a=>{const row=grid[a.r];const id=row&&row[a.c];if(id&&pieces[id]&&pieces[id].owner==="blue")setType(pieces[id],a.type);});
+  guestArmy=null;phase="play";placebar.classList.add("hide");setVisibility("red");broadcastState();beginTurn("red");}
 function buildBoardCells(){clearInterval(timerInt);[...board.querySelectorAll(".cell,.piece,.arrow,.flash,.shock,.speed,.winring,.clash,.boardflash,.hole")].forEach(e=>e.remove());
   grid=Array.from({length:ROWS},()=>Array(COLS).fill(null));pieces={};selected=null;busy=false;nextId=1;
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const d=document.createElement("div");d.className="cell "+((r+c)%2?"dark":"light");d.style.left=px(c)+"px";d.style.top=py(r)+"px";board.appendChild(d);}}
@@ -815,7 +820,6 @@ function buildGame(){
   setTypeAt("red",5,3,"wood");setTypeAt("red",5,1,"flag");
   if(mode!=="cpu"){setTypeAt("blue",0,3,"wood");setTypeAt("blue",0,5,"flag");}
   if(mode==="cpu")randomArmy("blue");
-  if(mode==="online"){randomArmy("red");randomArmy("blue");}
 }
 function addPiece(owner,type,r,c){
   const el=document.createElement("div");el.className="piece";el.style.setProperty("--bd",(-(Math.random()*2.6).toFixed(2))+"s");board.appendChild(el);
@@ -829,7 +833,7 @@ function setTypeAt(o,r,c,t){const p=pieces[grid[r][c]];if(p&&p.owner===o)setType
 function ownPieces(o){return Object.values(pieces).filter(p=>p.owner===o);}
 function countType(o,t){return ownPieces(o).filter(p=>p.type===t).length;}
 function randomArmy(o){const ps=ownPieces(o);ps.forEach(p=>setType(p,rnd(TYPES)));setType(rnd(ps),"wood");let f;do{f=rnd(ps);}while(f.type==="wood");setType(f,"flag");}
-function markHome(who){board.querySelectorAll(".cell").forEach((el,i)=>{const r=Math.floor(i/COLS);el.classList.toggle("mine",who==="red"?r>=4:r<2);});}
+function markHome(who){board.querySelectorAll(".cell").forEach((el,i)=>{let r=Math.floor(i/COLS);if(flipView)r=ROWS-1-r;el.classList.toggle("mine",who==="red"?r>=4:r<2);});}
 function setVisibility(viewer){for(const id in pieces){const p=pieces[id];p.el.classList.toggle("show",p.owner===viewer);if(p.type==="wood"||p.type==="flag")renderFigure(p);}}
 function ninjaOf(p){return p.el.querySelector(".ninja");}
 function hop(p){if(!pieces[p.id])return;const n=ninjaOf(p);if(n){n.classList.remove("hop");void n.offsetWidth;n.classList.add("hop");setTimeout(()=>{if(n)n.classList.remove("hop");},760);}}
@@ -877,12 +881,13 @@ function renderStatus(){if(phase==="place"){statusEl.textContent=pname(placer)+"
 board.addEventListener("click",e=>{
   if(!overlay.classList.contains("hide")||!settingsEl.classList.contains("hide")||!choiceEl.classList.contains("hide"))return;
   const rect=board.getBoundingClientRect();const S=rect.width/board.offsetWidth||1;
-  const c=Math.floor(((e.clientX-rect.left)/S-board.clientLeft-PAD)/CELL),r=Math.floor(((e.clientY-rect.top)/S-board.clientTop-PAD)/CELL);
-  if(!inB(r,c))return;
+  const vc=Math.floor(((e.clientX-rect.left)/S-board.clientLeft-PAD)/CELL),vr=Math.floor(((e.clientY-rect.top)/S-board.clientTop-PAD)/CELL);
+  if(!inB(vr,vc))return;
+  const r=flipView?ROWS-1-vr:vr,c=flipView?COLS-1-vc:vc;
   if(phase==="place"){const id=grid[r][c];if(id&&pieces[id].owner===placer){
       if(brush==="wood"||brush==="flag"){ownPieces(placer).forEach(p=>{if(p.type===brush)setType(p,"rock");});setType(pieces[id],brush);}else setType(pieces[id],brush);
       sSel();updateCounts();}return;}
-  if(mode==="online"&&!isHost){if(phase==="play"&&turn==="blue"){const lr=flipView?ROWS-1-r:r,lc=flipView?COLS-1-c:c;netSend({t:"tap",r:lr,c:lc});}return;}
+  if(mode==="online"&&!isHost){if(phase==="play"&&turn==="blue")netSend({t:"tap",r,c});return;}
   if(phase!=="play"||busy)return;
   if(mode==="online"&&turn!=="red")return;
   const id=grid[r][c];
@@ -909,8 +914,12 @@ applyFS();
 muteBtn.onclick=()=>{sound=!sound;muteBtn.textContent=sound?"🔊":"🔇";if(sound){ac();sSel();}saveSet();};
 
 function finishPlacement(){
-  if(countType(placer,"wood")!==1){statusEl.textContent="Place exactly ONE 🪵 totem";return;}
-  if(countType(placer,"flag")!==1){statusEl.textContent="Place exactly ONE 👑 commander";return;}
+  if(countType(placer,"wood")!==1){statusEl.textContent="הצב טוטם אחד בדיוק 🪵";return;}
+  if(countType(placer,"flag")!==1){statusEl.textContent="הצב מצביא אחד בדיוק 👑";return;}
+  if(mode==="online"){placebar.classList.add("hide");
+    if(isHost){hostReady=true;statusEl.textContent=guestArmy?"מתחיל…":"מוכן! ממתין שהיריב יסיים… ⏳";tryStartOnline();}
+    else{netSend({t:"army",pieces:ownPieces("blue").map(p=>({r:p.r,c:p.c,type:p.type}))});statusEl.textContent="מוכן! ממתין שהמארח יתחיל… ⏳";}
+    return;}
   if(mode==="2p"&&placer==="red"){placer="blue";showPass("blue","place");return;}
   phase="play";placebar.classList.add("hide");playbar.classList.remove("hide");updateCounts();nextRound("red");
 }
