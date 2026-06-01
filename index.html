@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>RPS Online</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Rubik","Segoe UI",Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;
-       padding:14px;color:#26331a;user-select:none;overflow:hidden;
+       padding:6px;color:#26331a;user-select:none;overflow:hidden;
        background:radial-gradient(1000px 560px at 50% -10%,#3a7d2c,transparent 60%),
                   radial-gradient(700px 500px at 85% 115%,rgba(60,140,40,.5),transparent 60%),
                   linear-gradient(165deg,#16321a,#0a1c0e 75%)}
-  #win{position:relative;width:700px;max-width:100%;background:linear-gradient(#d6ec9f,#bcdf7e);
+  #win{position:relative;width:700px;flex:none;background:linear-gradient(#d6ec9f,#bcdf7e);
        border:1px solid rgba(255,255,255,.4);border-radius:18px;overflow:hidden;
        box-shadow:0 26px 60px rgba(0,0,0,.6),0 0 0 4px #5e8a2c,0 0 0 6px rgba(255,255,255,.15),inset 0 1px 0 rgba(255,255,255,.5)}
   #titlebar{background:linear-gradient(#a6d165,#7fb23f);color:#23380f;font-weight:700;padding:8px 14px;
@@ -838,12 +838,16 @@ $("startbtn").onclick=finishPlacement;
 $("reset").onclick=showSetup;
 $("gearBtn").onclick=()=>{ac();showSettings();};
 let maxed=false;
-function applyFS(){const w=$("win");
-  if(maxed){const s=Math.max(.4,Math.min(innerWidth/w.offsetWidth,innerHeight/w.offsetHeight)*0.98);w.style.transform="scale("+s+")";document.body.classList.add("maxed");}
-  else{w.style.transform="";document.body.classList.remove("maxed");}}
+function applyFS(){const w=$("win");const W=w.offsetWidth||700,H=w.offsetHeight||600;
+  let s;
+  if(maxed){s=Math.max(.3,Math.min((innerWidth-4)/W,(innerHeight-4)/H)*0.99);}
+  else{s=Math.min(1,(innerWidth-8)/W,(innerHeight-8)/H);}
+  w.style.transform=(s<1||maxed)?("scale("+s.toFixed(4)+")"):"";}
 $("fsBtn").onclick=()=>{maxed=!maxed;applyFS();try{if(maxed){if(!document.fullscreenElement)document.documentElement.requestFullscreen();}else if(document.fullscreenElement)document.exitFullscreen();}catch(e){}};
 document.addEventListener("fullscreenchange",()=>{if(!document.fullscreenElement&&maxed){maxed=false;}applyFS();});
-addEventListener("resize",applyFS);
+addEventListener("resize",applyFS);addEventListener("orientationchange",()=>setTimeout(applyFS,250));
+try{new ResizeObserver(()=>applyFS()).observe($("win"));}catch(e){}
+applyFS();
 muteBtn.onclick=()=>{sound=!sound;muteBtn.textContent=sound?"🔊":"🔇";if(sound){ac();sSel();}saveSet();};
 
 function finishPlacement(){
