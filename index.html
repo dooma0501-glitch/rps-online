@@ -379,10 +379,10 @@ const UPGRADES=[
 function up(){return prog.up||{};}
 function isMine(o){return mode==="cpu"?(o==="red"):(mode==="online"?false:true);}
 const COLORS=[
-  {id:"red",name:"אדום",c:"#b23a2a",lv:1},{id:"orange",name:"כתום",c:"#d4691e",lv:1},
+  {id:"red",name:"אדום",c:"#b23a2a",lv:1},{id:"orange",name:"כתום",c:"#d4691e",lv:2},
   {id:"amber",name:"ענבר",c:"#dca017",lv:2},{id:"lime",name:"ליים",c:"#74a82e",lv:3},
-  {id:"green",name:"ירוק",c:"#3f9a3a",lv:5},{id:"teal",name:"טורקיז",c:"#1f9a8a",lv:7},
-  {id:"cyan",name:"תכלת",c:"#2ca5c9",lv:9},{id:"blue",name:"כחול",c:"#3f74c9",lv:11},
+  {id:"green",name:"ירוק",c:"#3f9a3a",lv:1},{id:"teal",name:"טורקיז",c:"#1f9a8a",lv:7},
+  {id:"cyan",name:"תכלת",c:"#2ca5c9",lv:9},{id:"blue",name:"כחול",c:"#3f74c9",lv:1},
   {id:"indigo",name:"אינדיגו",c:"#4a52c0",lv:14},{id:"violet",name:"סגול",c:"#8a45c0",lv:17},
   {id:"magenta",name:"מג'נטה",c:"#c0398f",lv:20},{id:"pink",name:"ורוד",c:"#e06a9a",lv:24},
   {id:"slate",name:"פלדה",c:"#5a6a7a",lv:28},{id:"black",name:"שחור",c:"#34383e",lv:32},
@@ -400,7 +400,9 @@ function pal(team){
   const BLUE={gi:"#3f74c9",giD:"#28528f",hair:"#2a4fa0",band:"#16356e",glow:null};
   const RED={gi:"#b23a2a",giD:"#7c2316",hair:"#3a2a18",band:"#5e1810",glow:null};
   if(team===mySide())return myPal();
-  return team==="red"?RED:BLUE;}
+  // opponent is always drawn in a color that contrasts YOUR color (no clash)
+  const cool=["blue","cyan","teal","indigo","slate","neon"];
+  return cool.includes(prog.color)?RED:BLUE;}
 
 function ac(){try{if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)();masterGain=audioCtx.createGain();masterGain.gain.value=volume;masterGain.connect(audioCtx.destination);}if(audioCtx.state==="suspended")audioCtx.resume();}catch(e){}return audioCtx;}
 function tone(f,d,t,v,dl){if(!sound)return;const c=ac();if(!c)return;const tt=c.currentTime+(dl||0);const o=c.createOscillator(),g=c.createGain();o.type=t||"square";o.frequency.value=f;g.gain.setValueAtTime(v||.12,tt);g.gain.exponentialRampToValueAtTime(.0008,tt+d);o.connect(g);g.connect(masterGain||c.destination);o.start(tt);o.stop(tt+d+.02);}
