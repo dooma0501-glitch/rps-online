@@ -393,7 +393,8 @@ const COLORS=[
 function darken(hex,f){const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);if(!m)return hex;const r=Math.round(parseInt(m[1],16)*f),g=Math.round(parseInt(m[2],16)*f),b=Math.round(parseInt(m[3],16)*f);return "#"+[r,g,b].map(x=>x.toString(16).padStart(2,"0")).join("");}
 function colorUnlocked(c){return c.premium?prog.premOwned.includes(c.id):prog.level>=c.lv;}
 function playerColor(){const c=COLORS.find(x=>x.id===prog.color);return (c&&colorUnlocked(c))?c:COLORS[0];}
-function pal(team){if(team!=="red"){return {gi:"#3f74c9",giD:"#28528f",hair:"#2a4fa0",band:"#16356e",glow:null};}
+function pal(team){if(typeof mode!=="undefined"&&mode==="online"){return team==="red"?{gi:"#b23a2a",giD:"#7c2316",hair:"#3a2a18",band:"#5e1810",glow:null}:{gi:"#3f74c9",giD:"#28528f",hair:"#2a4fa0",band:"#16356e",glow:null};}
+  if(team!=="red"){return {gi:"#3f74c9",giD:"#28528f",hair:"#2a4fa0",band:"#16356e",glow:null};}
   const pc=playerColor();if(pc.c==="rainbow")return {gi:"url(#gRainbow)",giD:"#6a2a8a",hair:"#3a2a18",band:"#4a1a6a",glow:null};
   return {gi:pc.c,giD:darken(pc.c,.6),hair:"#3a2a18",band:darken(pc.c,.42),glow:pc.glow?pc.c:null};}
 
@@ -609,22 +610,69 @@ function joinPrompt(){if(!needPeer())return;isHost=false;
     peer.on("error",e=>{oStat("שגיאה: "+((e&&e.type)||e)+" — בדוק את הקוד");});};
 }
 function bindConn(){
-  conn.on("open",()=>{online=true;oStat("✅ מחובר! "+(isHost?"אתה המארח":"הצטרפת"));netSend({t:"hi"});
-    const b=$("oBody");if(b)b.innerHTML+=`<p style="color:#2e7d32;font-weight:700;margin:8px 0 4px">מחוברים! 🎉 בדקו צ'אט (סנכרון המשחק בשלב הבא):</p>
-      <div id="netlog" style="max-height:120px;overflow-y:auto;text-align:right;font-size:.86rem;background:#f6f8ef;border-radius:8px;padding:6px;margin-bottom:6px"></div>
+  conn.on("open",()=>{online=true;oStat("✅ מחובר! "+(isHost?"אתה המארח (אדום)":"הצטרפת (כחול)"));netSend({t:"hi"});
+    const b=$("oBody");if(b)b.innerHTML+=`<p style="color:#2e7d32;font-weight:700;margin:8px 0 4px">מחוברים! 🎉</p>
+      ${isHost?`<button class="bigbtn" id="oStart">▶ התחל משחק</button>`:`<p style="color:#777;font-size:.85rem">ממתין שהמארח יתחיל…</p>`}
+      <div id="netlog" style="max-height:84px;overflow-y:auto;text-align:right;font-size:.84rem;background:#f6f8ef;border-radius:8px;padding:6px;margin:6px 0"></div>
       <div class="obtns"><input class="codein" id="netchat" style="font-size:1rem;letter-spacing:0;flex:1" placeholder="הודעה ליריב"><button class="bigbtn" id="netsend">שלח</button></div>`;
-    const ns=$("netsend");if(ns)ns.onclick=netChatSend;const nc=$("netchat");if(nc)nc.addEventListener("keydown",e=>{if(e.key==="Enter")netChatSend();});});
+    const ns=$("netsend");if(ns)ns.onclick=netChatSend;const nc=$("netchat");if(nc)nc.addEventListener("keydown",e=>{if(e.key==="Enter")netChatSend();});
+    if(isHost){const sb=$("oStart");if(sb)sb.onclick=startOnlineHost;}});
   conn.on("data",handleNet);
-  conn.on("close",()=>{online=false;oStat("היריב התנתק ✖");});
+  conn.on("close",()=>{online=false;oStat("היריב התנתק ✖");if(mode==="online"&&phase==="play")statusEl.textContent="היריב התנתק ✖";});
   conn.on("error",e=>{oStat("שגיאת חיבור: "+((e&&e.type)||e));});
 }
 function netChatSend(){const i=$("netchat");if(!i)return;const t=i.value.trim();if(!t)return;netLog("אתה",t);netSend({t:"chat",text:t});i.value="";}
 function handleNet(msg){if(!msg||typeof msg!=="object")return;
-  if(msg.t==="chat")netLog("יריב",String(msg.text).slice(0,200));
-  // (next stage: t==="place" / "move" / "pick" / "state")
+  if(msg.t==="chat"){netLog("יריב",String(msg.text).slice(0,200));return;}
+  if(isHost){
+    if(msg.t==="tap")guestTap(msg.r,msg.c);
+    else if(msg.t==="pick"){const fn=repickResolver;repickResolver=null;if(fn)fn(msg.weapon);}
+  }else{
+    if(msg.t==="begin")guestStart();
+    else if(msg.t==="state")renderSnapshot(msg);
+    else if(msg.t==="pickreq"){repickResolver=(w)=>netSend({t:"pick",weapon:w});showChoice("blue");}
+    else if(msg.t==="over")endGame(msg.w);
+  }
 }
 function closePeer(){try{if(peer)peer.destroy();}catch(e){}peer=null;}
 function closeNet(){try{if(conn)conn.close();}catch(e){}closePeer();conn=null;online=false;}
+function startOnlineHost(){if(!isHost||!online)return;netSend({t:"begin"});
+  $("online").classList.add("hide");$("online").innerHTML="";hideOverlay();
+  mode="online";$("win").classList.add("playing");placebar.classList.add("hide");playbar.classList.add("hide");
+  buildGame();phase="play";setVisibility("red");broadcastState();beginTurn("red");}
+function guestStart(){mode="online";isHost=false;
+  $("online").classList.add("hide");$("online").innerHTML="";hideOverlay();
+  $("win").classList.add("playing");placebar.classList.add("hide");playbar.classList.add("hide");
+  buildBoardCells();phase="play";statusEl.textContent="המשחק התחיל!";}
+function buildBoardCells(){clearInterval(timerInt);[...board.querySelectorAll(".cell,.piece,.arrow,.flash,.shock,.speed,.winring,.clash,.boardflash,.hole")].forEach(e=>e.remove());
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(null));pieces={};selected=null;busy=false;nextId=1;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const d=document.createElement("div");d.className="cell "+((r+c)%2?"dark":"light");d.style.left=px(c)+"px";d.style.top=py(r)+"px";board.appendChild(d);}}
+function broadcastState(){if(!online||!isHost)return;
+  const arr=Object.values(pieces).map(p=>({id:p.id,o:p.owner,r:p.r,c:p.c,t:(p.owner==="blue"||p.seen)?p.type:null}));
+  const sel=(selected&&pieces[selected]&&pieces[selected].owner==="blue")?{r:pieces[selected].r,c:pieces[selected].c}:null;
+  let mv=[];if(sel)mv=getMoves(sel.r,sel.c).map(m=>({r:m.r,c:m.c,a:!!m.attack}));
+  const st=phase==="over"?"המשחק נגמר":(turn==="blue"?"תורך — בחר חייל":"ממתין ליריב… ⏳");
+  netSend({t:"state",turn,phase,pieces:arr,sel,moves:mv,status:st,score,time:timeLeft});}
+function mkGuestPiece(d){const el=document.createElement("div");el.className="piece";el.style.setProperty("--bd",(-(Math.random()*2.6).toFixed(2))+"s");
+  el.style.transition="none";el.style.transform="translate("+(px(d.c)+OFF)+"px,"+(py(d.r)+OFF)+"px)";board.appendChild(el);
+  const p={id:d.id,owner:d.o,type:d.t||"rock",r:d.r,c:d.c,el};pieces[d.id]=p;return p;}
+function renderSnapshot(s){turn=s.turn;phase=s.phase;if(s.score){score=s.score;renderScore();}
+  const seen={};
+  (s.pieces||[]).forEach(d=>{seen[d.id]=1;let p=pieces[d.id];if(!p)p=mkGuestPiece(d);
+    p.owner=d.o;p.r=d.r;p.c=d.c;p.type=d.t||"rock";
+    p.el.classList.toggle("show",d.o==="blue"||d.t!=null);
+    renderFigure(p);setPos(p);});
+  for(const id in pieces){if(!seen[id]){const e2=pieces[id].el;e2.style.transition="transform .4s,opacity .4s";e2.style.opacity="0";delete pieces[id];setTimeout(()=>e2.remove(),420);}}
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(null));for(const id in pieces){grid[pieces[id].r][pieces[id].c]=+id;}
+  renderTurnLbl();statusEl.textContent=s.status||"";
+  if(s.time!=null){tnum.textContent=s.time;tring.style.strokeDashoffset=(1-s.time/60)*TC;tring.style.stroke=turn==="red"?"#e23b2e":"#2b86c5";timerBox.classList.toggle("low",s.time<=10);}
+  setRefTurn(turn);
+  clearArrows();(s.moves||[]).forEach(m=>{const a=document.createElement("div");a.className="arrow "+(m.a?"attack":"move");a.innerHTML=m.a?crossSwords():swordMark();a.style.left=px(m.c)+"px";a.style.top=py(m.r)+"px";board.appendChild(a);});
+  if(s.sel){const row=grid[s.sel.r];const id=row&&row[s.sel.c];if(id&&pieces[id])pieces[id].el.classList.add("sel");}}
+function guestTap(r,c){if(!isHost||mode!=="online"||phase!=="play"||busy||turn!=="blue")return;if(!inB(r,c))return;
+  const id=grid[r][c];
+  if(id&&pieces[id].owner==="blue"){if(pieces[id].type==="wood")return;deselect();selected=id;pieces[id].el.classList.add("sel");showArrows(getMoves(r,c));broadcastState();return;}
+  if(selected){const sp=pieces[selected];if(sp&&getMoves(sp.r,sp.c).some(m=>m.r===r&&m.c===c))executeTurn(sp.r,sp.c,r,c);else{deselect();broadcastState();}}}
 function showTerms(){const u=$("terms");u.classList.remove("hide");
   u.innerHTML=`<div class="card" dir="rtl"><h2>📜 תקנון ותנאי שימוש</h2>
     <div class="terms-txt">
@@ -761,6 +809,7 @@ function buildGame(){
   setTypeAt("red",5,3,"wood");setTypeAt("red",5,1,"flag");
   if(mode!=="cpu"){setTypeAt("blue",0,3,"wood");setTypeAt("blue",0,5,"flag");}
   if(mode==="cpu")randomArmy("blue");
+  if(mode==="online"){randomArmy("red");randomArmy("blue");}
 }
 function addPiece(owner,type,r,c){
   const el=document.createElement("div");el.className="piece";el.style.setProperty("--bd",(-(Math.random()*2.6).toFixed(2))+"s");board.appendChild(el);
@@ -827,10 +876,13 @@ board.addEventListener("click",e=>{
   if(phase==="place"){const id=grid[r][c];if(id&&pieces[id].owner===placer){
       if(brush==="wood"||brush==="flag"){ownPieces(placer).forEach(p=>{if(p.type===brush)setType(p,"rock");});setType(pieces[id],brush);}else setType(pieces[id],brush);
       sSel();updateCounts();}return;}
-  if(phase!=="play"||busy)return;const id=grid[r][c];
+  if(mode==="online"&&!isHost){if(phase==="play"&&turn==="blue")netSend({t:"tap",r,c});return;}
+  if(phase!=="play"||busy)return;
+  if(mode==="online"&&turn!=="red")return;
+  const id=grid[r][c];
   if(id&&pieces[id].owner===turn){if(pieces[id].type==="wood"){statusEl.textContent="הטוטם לא זז 🪵";return;}
-    deselect();selected=id;pieces[id].el.classList.add("sel");showArrows(getMoves(r,c));sSel();return;}
-  if(selected){const sp=pieces[selected];if(getMoves(sp.r,sp.c).some(m=>m.r===r&&m.c===c))executeTurn(sp.r,sp.c,r,c);else deselect();}
+    deselect();selected=id;pieces[id].el.classList.add("sel");showArrows(getMoves(r,c));sSel();if(mode==="online"&&isHost)broadcastState();return;}
+  if(selected){const sp=pieces[selected];if(getMoves(sp.r,sp.c).some(m=>m.r===r&&m.c===c))executeTurn(sp.r,sp.c,r,c);else{deselect();if(mode==="online"&&isHost)broadcastState();}}
 });
 document.querySelectorAll(".brush").forEach(b=>{b.innerHTML=iconOf(b.dataset.t);b.addEventListener("click",()=>{brush=b.dataset.t;document.querySelectorAll(".brush").forEach(x=>x.classList.remove("on"));b.classList.add("on");sSel();});});
 $("rnd").onclick=()=>{randomArmy(placer);sSel();updateCounts();};
@@ -861,13 +913,15 @@ function showBanner(who){bannerEl.textContent="תור "+clabel(who);bannerEl.cla
 function beginTurn(who){turn=who;bangGong(who);deselect();renderTurnLbl();showBanner(who);speak(who==="red"?"אדום":"כחול");
   setTimer(60,false);clearInterval(timerInt);timerInt=setInterval(tick,1000);
   if(mode==="cpu"&&who==="blue"){busy=true;statusKey="thinking";renderStatus();setTimeout(runAI,820);}
-  else{busy=false;statusKey="yourTurn";renderStatus();}updateCounts();}
+  else if(mode==="online"&&who==="blue"){busy=false;statusEl.textContent="ממתין ליריב… ⏳";}
+  else{busy=false;statusKey="yourTurn";renderStatus();}
+  updateCounts();if(mode==="online"&&isHost)broadcastState();}
 function setTimer(v,ph){timeLeft=v;tnum.textContent=ph?"–":v;tring.style.strokeDashoffset=ph?0:(1-v/60)*TC;tring.style.stroke=turn==="red"?"#e23b2e":turn==="blue"?"#2b86c5":"#888";timerBox.classList.remove("low");}
 function renderTimer(){tnum.textContent=timeLeft;tring.style.strokeDashoffset=(1-timeLeft/60)*TC;tring.style.stroke=turn==="red"?"#e23b2e":"#2b86c5";timerBox.classList.toggle("low",timeLeft<=10);}
 function tick(){timeLeft--;renderTimer();if(timeLeft<=0){clearInterval(timerInt);onTimeout();}}
 function onTimeout(){const mv=randomMove(turn);if(!mv){endGame(other(turn));return;}statusKey="timeout";renderStatus();executeTurn(mv.fr,mv.fc,mv.tr,mv.tc);}
 function randomMove(o){const l=[];ownPieces(o).forEach(p=>getMoves(p.r,p.c).forEach(m=>l.push({fr:p.r,fc:p.c,tr:m.r,tc:m.c})));return l.length?rnd(l):null;}
-function recordReveal(p){if(p&&pieces[p.id]&&p.owner==="red")aiMemory[p.id]=p.type;}
+function recordReveal(p){if(p&&pieces[p.id]){p.seen=true;if(p.owner==="red")aiMemory[p.id]=p.type;}}
 async function runAI(){if(phase!=="play")return;const moves=[];
   ownPieces("blue").forEach(p=>getMoves(p.r,p.c).forEach(m=>moves.push({p,m})));if(!moves.length){endGame("red");return;}
   moves.forEach(o=>{const adv=o.m.r-o.p.r;let s;
@@ -876,10 +930,10 @@ async function runAI(){if(phase!=="play")return;const moves=[];
       if(tgt.type==="wood")s-=5;else if(k){const r=fight(o.p.type,k);s+=r==="a"?3:r==="tie"?-.5:-3;}else s+=.7;}}
     else s=Math.random()+adv*.6+(o.m.attack?.8:0);if(o.p.type==="flag")s-=2.5;o.s=s;});
   moves.sort((a,b)=>b.s-a.s);const mv=moves[0];await executeTurn(mv.p.r,mv.p.c,mv.m.r,mv.m.c);}
-async function executeTurn(fr,fc,tr,tc){clearInterval(timerInt);busy=true;deselect();await doMove(fr,fc,tr,tc);if(phase!=="play")return;if(checkEnd())return;nextRound(other(turn));}
+async function executeTurn(fr,fc,tr,tc){clearInterval(timerInt);busy=true;deselect();await doMove(fr,fc,tr,tc);if(mode==="online"&&isHost)broadcastState();if(phase!=="play")return;if(checkEnd())return;nextRound(other(turn));}
 function checkEnd(){const{r,b}=updateCounts();if(r===0){endGame("blue");return true;}if(b===0){endGame("red");return true;}
   if(!hasMoves(other(turn))){endGame(turn);return true;}return false;}
-function endGame(w){phase="over";busy=false;clearInterval(timerInt);deselect();for(const id in pieces)pieces[id].el.classList.add("show");
+function endGame(w){phase="over";busy=false;clearInterval(timerInt);deselect();if(mode==="online"&&isHost)netSend({t:"over",w});for(const id in pieces)pieces[id].el.classList.add("show");
   clearRefTurn();renderTurnLbl();setTimer(60,true);score[w]++;saveScore();renderScore();
   xpGained=mode==="cpu"?(w==="red"?100:30):60;lvlsGained=addXP(xpGained);
   gemGained=mode==="cpu"?(w==="red"?8:2):4;if(mode!=="cpu"||w==="red")gemGained+=(up().income||0)*2;prog.gems+=gemGained;saveProg();
@@ -887,6 +941,7 @@ function endGame(w){phase="over";busy=false;clearInterval(timerInt);deselect();f
 
 function pickWeapon(who){
   if(mode==="cpu"&&who==="blue")return Promise.resolve(rnd(TYPES));
+  if(mode==="online"&&isHost&&who==="blue"){netSend({t:"pickreq"});return new Promise(res=>{repickResolver=res;});}
   return new Promise(res=>{repickResolver=res;showChoice(who);});
 }
 function showChoice(who){choiceEl.classList.remove("hide");
