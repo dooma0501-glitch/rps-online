@@ -339,7 +339,7 @@ try{const s=JSON.parse(localStorage.getItem("rps_score"));if(s&&typeof s.red==="
 try{const s=JSON.parse(localStorage.getItem("rps_set2"));if(s){sound=s.sound!==false;volume=typeof s.volume==="number"?s.volume:volume;}}catch(e){}
 const saveScore=()=>{try{localStorage.setItem("rps_score",JSON.stringify(score))}catch(e){}};
 const saveSet=()=>{try{localStorage.setItem("rps_set2",JSON.stringify({sound,volume}))}catch(e){}};
-const PROG_DEF={xp:0,level:1,theme:"china",gems:0,owned:[],gear:{helmet:"",weapon:"",shield:"",armor:""},up:{range:0,leap:0,dodge:0,income:0},color:"red",premOwned:[],streak:0};
+const PROG_DEF={xp:0,level:1,theme:"china",gems:0,owned:[],gear:{helmet:"",weapon:"",shield:"",armor:""},up:{range:0,leap:0,dodge:0,income:0},color:"red",premOwned:[],streak:0,lastDay:""};
 let prog=Object.assign({},PROG_DEF);
 try{const s=JSON.parse(localStorage.getItem("rps_prog"));if(s&&typeof s.xp==="number")prog=Object.assign({},PROG_DEF,s);}catch(e){}
 if(!prog.gear||typeof prog.gear!=="object")prog.gear={helmet:"",weapon:"",shield:"",armor:""};
@@ -350,6 +350,7 @@ if(!prog.up||typeof prog.up!=="object")prog.up={};
 if(typeof prog.color!=="string")prog.color="red";
 if(!Array.isArray(prog.premOwned))prog.premOwned=[];
 if(typeof prog.streak!=="number")prog.streak=0;
+if(typeof prog.lastDay!=="string")prog.lastDay="";
 const XP_LV=120;
 function calcLevel(){prog.level=Math.min(100,1+Math.floor(prog.xp/XP_LV));}
 function addXP(n){const before=prog.level;prog.xp+=n;calcLevel();saveProg();return prog.level-before;}
@@ -358,7 +359,7 @@ const THEMES=[{id:"china",name:"🀄 סין העתיקה",lv:1},{id:"russia",nam
 const UNITS=[{lv:10,icon:"🛡️",name:"מגן",desc:"חוסם את ההתקפה הראשונה"},{lv:20,icon:"⚔️",name:"פושט",desc:"מנצח חיילים רגילים"},{lv:30,icon:"🏹",name:"קשת",desc:"פוגע ממרחק 2 משבצות"},{lv:40,icon:"🥷",name:"מתנקש",desc:"זז עד 2 משבצות"},{lv:50,icon:"🐉",name:"דרקון",desc:"שורף בניצחון"},{lv:60,icon:"💣",name:"מפציץ",desc:"מתפוצץ כשנלכד"},{lv:70,icon:"🧱",name:"חומה",desc:"חוסם ולא זז"},{lv:80,icon:"👻",name:"רוח רפאים",desc:"חומק מעבר לחייל אחד"},{lv:90,icon:"⚡",name:"ברק",desc:"תמיד מכה ראשון"},{lv:100,icon:"👑",name:"אלוף",desc:"מנצח קרב אחד באופן מוחלט"}];
 function applyTheme(){document.body.className=("theme-"+prog.theme);}
 calcLevel();
-let xpGained=0,lvlsGained=0,gemGained=0,lastStreakBonus=0,lastUnlocks=[];
+let xpGained=0,lvlsGained=0,gemGained=0,lastStreakBonus=0,lastUnlocks=[],lastDailyBonus=0;
 function unlocksBetween(lo,hi){const o=[];
   THEMES.forEach(t=>{if(t.lv>lo&&t.lv<=hi)o.push("🖼️ "+t.name);});
   UNITS.forEach(u=>{if(u.lv>lo&&u.lv<=hi)o.push(u.icon+" "+u.name);});
@@ -588,7 +589,7 @@ function showSetup(){
   phase="setup";clearInterval(timerInt);particles=[];showOverlay();renderScore();$("win").classList.remove("playing");
   const pct=prog.level>=100?100:Math.round((prog.xp%XP_LV)/XP_LV*100);
   overlay.innerHTML=`<div class="card menu" dir="rtl"><h1 id="logoTitle">D.Y ONLINE</h1><p class="sub">קרב האבן · נייר · מספריים</p><div style="font-size:.82rem;color:#7a9c3c;margin-top:1px;font-weight:700">👤 ${account?account.nick:"אורח"}</div>
-    <div class="lvbox">⭐ רמה ${prog.level}<div class="xpbar"><i style="width:${pct}%"></i></div>${prog.level>=100?"מקס":""}<span class="gembox">💎 ${prog.gems}</span></div>
+    <div class="lvbox">⭐ רמה ${prog.level}<div class="xpbar"><i style="width:0"></i></div>${prog.level>=100?"מקס":""}<span class="gembox">💎 ${prog.gems}</span></div>
     ${(()=>{const n=nextUnlock();return (prog.level<100&&n)?`<div style="text-align:center;font-size:.75rem;color:#7a9c3c;margin:-2px 0 4px;font-weight:600">🔜 רמה ${n.lv}: ${n.name}${prog.streak>1?` &nbsp;·&nbsp; 🔥 רצף ${prog.streak}`:""}</div>`:(prog.streak>1?`<div style="text-align:center;font-size:.75rem;color:#e8631a;margin:-2px 0 4px;font-weight:600">🔥 רצף ${prog.streak}</div>`:"");})()}
     <div class="optrow"><div class="optg"><span class="gl">מצב משחק</span>
       <button class="opt" data-g="mode" data-v="cpu">🤖 נגד המחשב</button><button class="opt" data-g="mode" data-v="2p">👥 2 שחקנים</button></div></div>
@@ -614,6 +615,7 @@ function showSetup(){
   $("openColors").onclick=()=>showColors();
   $("openOnline").onclick=()=>showOnline();
   const lt=$("logoTitle");if(lt)lt.onclick=adminTap;
+  const mbar=overlay.querySelector(".lvbox .xpbar i");if(mbar)setTimeout(()=>{mbar.style.width=pct+"%";},90);
 }
 const ADMIN={user:"admin",pass:"dy1234"};
 let adminTaps=0,adminTapTimer=0;
@@ -888,6 +890,7 @@ function showOver(w){showOverlay();const youWin=mode==="cpu"&&w==="red";
     <div class="lvbox" style="justify-content:center">⭐ רמה ${prog.level}<div class="xpbar" style="max-width:200px"><i style="width:0%"></i></div></div>
     ${(mode==="cpu"&&prog.streak>1)?`<p style="color:#e8631a;font-weight:800;margin:2px 0">🔥 רצף ${prog.streak} ניצחונות${lastStreakBonus?` · בונוס +${lastStreakBonus} 💎`:""}</p>`:""}
     ${(lastUnlocks&&lastUnlocks.length)?`<p style="color:#7a3fbf;font-weight:800;margin:2px 0">🎉 נפתח: ${lastUnlocks.join(" · ")}</p>`:""}
+    ${lastDailyBonus?`<p style="color:#1f8a4d;font-weight:800;margin:2px 0">🎁 בונוס יומי: +${lastDailyBonus} 💎</p>`:""}
     <p>${mode==="cpu"?(youWin?"כל הכבוד! 🏆":"נסה שוב 💪"):""}</p>
     <button class="bigbtn" id="again">▶ שחק שוב</button>
     <div class="menurow" style="grid-template-columns:repeat(3,1fr)">
@@ -896,6 +899,7 @@ function showOver(w){showOverlay();const youWin=mode==="cpu"&&w==="red";
       <button class="mbtn" id="ovSet">⚙️<span>הגדרות</span></button>
     </div></div>`;
   const bar=overlay.querySelector(".xpbar i");if(bar)setTimeout(()=>{bar.style.width=pct+"%";},90);
+  if(lvlsGained>0){try{[523,659,784,1047].forEach((f,i)=>tone(f,.2,"triangle",.16,i*.09));}catch(e){}}
   $("again").onclick=()=>{ac();sSel();startPlacement();};
   $("ovUp").onclick=()=>showUpgrades();
   $("ovMenu").onclick=()=>{ac();sSel();showSetup();};
@@ -1075,11 +1079,12 @@ function checkEnd(){const{r,b}=updateCounts();if(r===0){endGame("blue");return t
   if(!hasMoves(other(turn))){endGame(turn);return true;}return false;}
 function endGame(w){phase="over";busy=false;clearInterval(timerInt);deselect();if(mode==="online"&&isHost)netSend({t:"over",w});for(const id in pieces)pieces[id].el.classList.add("show");
   clearRefTurn();renderTurnLbl();setTimer(60,true);score[w]++;saveScore();renderScore();
-  const oldLevel=prog.level;
-  xpGained=mode==="cpu"?(w==="red"?100:30):60;lvlsGained=addXP(xpGained);
+  const oldLevel=prog.level;const DX={easy:70,normal:100,hard:150},DG={easy:6,normal:8,hard:12};
+  xpGained=mode==="cpu"?(w==="red"?(DX[difficulty]||100):30):60;lvlsGained=addXP(xpGained);
   if(mode==="cpu")prog.streak=(w==="red")?(prog.streak||0)+1:0;
   lastStreakBonus=(mode==="cpu"&&w==="red")?Math.min(prog.streak,6)*2:0;
-  gemGained=mode==="cpu"?(w==="red"?8:2):4;if(mode!=="cpu"||w==="red")gemGained+=(up().income||0)*2;gemGained+=lastStreakBonus;prog.gems+=gemGained;
+  const today=new Date().toISOString().slice(0,10);lastDailyBonus=(prog.lastDay!==today)?30:0;if(lastDailyBonus)prog.lastDay=today;
+  gemGained=mode==="cpu"?(w==="red"?(DG[difficulty]||8):2):4;if(mode!=="cpu"||w==="red")gemGained+=(up().income||0)*2;gemGained+=lastStreakBonus+lastDailyBonus;prog.gems+=gemGained;
   lastUnlocks=lvlsGained>0?unlocksBetween(oldLevel,prog.level):[];
   saveProg();
   mode==="cpu"?(w==="red"?sWin():sLose()):sWin();speak(w==="red"?"אדום ניצח":"כחול ניצח");confetti(160);fireworks();setTimeout(()=>showOver(w),1500);}
